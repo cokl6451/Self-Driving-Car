@@ -18,8 +18,8 @@ class Network(nn.Module):
         # Number of outputs
         self.nb_action = nb_action
         # Add full connections
-        self.fc1 = nn.Linear(input_size, 30) #input -> hidden
-        self.fc2 = nn.Linear(30, nb_action) #hidden -> output
+        self.fc1 = nn.Linear(input_size, 64) #input -> hidden
+        self.fc2 = nn.Linear(64, nb_action) #hidden -> output
 
     def forward(self, state):
         # Forward propagation
@@ -73,15 +73,20 @@ class Dqn():
         self.last_action = 0
         # Create last reward
         self.last_reward = 0
+        # Create device (CPU or GPU)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
+
 
     # Select action
     def select_action(self, state):
-        # Get probabilities of each action
-        probs = F.softmax(self.model(Variable(state, volatile = True)) * 200) # T=7
-        # Get random draw from distribution
-        action = probs.multinomial(1)
-        # Return action
-        return action.data[0,0]
+        # Get probabilities of actions
+        with torch.no_grad():
+            # Get probabilities of actions
+            probs = torch.softmax(self.model(state.to(self.device)) * 100, dim=1) #Temperature parameter T = 100
+            # Get action
+            action = probs.multinomial(num_samples=1)
+            return action.item()
     
     # Learn from new state
     def learn(self, batch_state, batch_next_state, batch_reward, batch_action):
