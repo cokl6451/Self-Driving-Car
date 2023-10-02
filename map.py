@@ -1,4 +1,4 @@
-# Self Driving Car
+# AI Little Bug
 
 # Importing the libraries
 import numpy as np
@@ -15,6 +15,7 @@ from kivy.config import Config
 from kivy.properties import NumericProperty, ReferenceListProperty, ObjectProperty
 from kivy.vector import Vector
 from kivy.clock import Clock
+from kivy.uix.label import Label
 
 # Importing the Dqn object from our AI in ai.py
 from ai import Dqn
@@ -22,7 +23,7 @@ from ai import Dqn
 # Adding this line if we don't want the right click to put a red point
 Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
 
-# Introducing last_x and last_y, used to keep the last point in memory when we draw the sand on the map
+# Introducing last_x and last_y, used to keep the last point in memory when we draw the bug repellant on the map
 last_x = 0
 last_y = 0
 n_points = 0
@@ -49,9 +50,9 @@ def init():
 # Initializing the last distance
 last_distance = 0
 
-# Creating the car class
+# Creating the bug class
 
-class Car(Widget):
+class Bug(Widget):
     
     angle = NumericProperty(0)
     rotation = NumericProperty(0)
@@ -95,18 +96,31 @@ class Ball2(Widget):
 class Ball3(Widget):
     pass
 
+class Goal(Widget):
+    def __init__(self, **kwargs):
+        super(Goal, self).__init__(**kwargs)
+        self.size = (100, 100)  # Set the size of the goal widget
+        self.label = Label(text="Goal", center=self.center, font_size='15sp')
+        self.add_widget(self.label)
+
+    def update_position(self, x, y):
+        self.pos = (x - self.width / 2, y - self.height / 2)
+        self.label.center = self.center # Update the label's center whenever the goal's position changes
+
+
 # Creating the game class
 
 class Game(Widget):
 
-    car = ObjectProperty(None)
+    bug = ObjectProperty(None)
     ball1 = ObjectProperty(None)
     ball2 = ObjectProperty(None)
     ball3 = ObjectProperty(None)
+    goal = ObjectProperty(None)
 
-    def serve_car(self):
-        self.car.center = self.center
-        self.car.velocity = Vector(6, 0)
+    def serve_bug(self):
+        self.bug.center = self.center
+        self.bug.velocity = Vector(6, 0)
 
     def update(self, dt):
 
@@ -114,54 +128,55 @@ class Game(Widget):
         global last_reward
         global scores
         global last_distance
-        global goal_x
-        global goal_y
         global longueur
         global largeur
 
         longueur = self.width
         largeur = self.height
+        goal_x = self.goal.center_x
+        goal_y = self.goal.center_y
         if first_update:
             init()
 
-        xx = goal_x - self.car.x
-        yy = goal_y - self.car.y
-        orientation = Vector(*self.car.velocity).angle((xx,yy))/180.
-        last_signal = [self.car.signal1, self.car.signal2, self.car.signal3, orientation, -orientation]
+        xx = goal_x - self.bug.x
+        yy = goal_y - self.bug.y
+        orientation = Vector(*self.bug.velocity).angle((xx,yy))/180.
+        last_signal = [self.bug.signal1, self.bug.signal2, self.bug.signal3, orientation, -orientation]
         action = brain.update(last_reward, last_signal)
         scores.append(brain.score())
         rotation = action2rotation[action]
-        self.car.move(rotation)
-        distance = np.sqrt((self.car.x - goal_x)**2 + (self.car.y - goal_y)**2)
-        self.ball1.pos = self.car.sensor1
-        self.ball2.pos = self.car.sensor2
-        self.ball3.pos = self.car.sensor3
+        self.bug.move(rotation)
+        distance = np.sqrt((self.bug.x - goal_x)**2 + (self.bug.y - goal_y)**2)
+        self.ball1.pos = self.bug.sensor1
+        self.ball2.pos = self.bug.sensor2
+        self.ball3.pos = self.bug.sensor3
 
-        if sand[int(self.car.x),int(self.car.y)] > 0:
-            self.car.velocity = Vector(1, 0).rotate(self.car.angle)
+        if sand[int(self.bug.x),int(self.bug.y)] > 0:
+            self.bug.velocity = Vector(1, 0).rotate(self.bug.angle)
             last_reward = -1
         else: # otherwise
-            self.car.velocity = Vector(6, 0).rotate(self.car.angle)
+            self.bug.velocity = Vector(6, 0).rotate(self.bug.angle)
             last_reward = -0.2
             if distance < last_distance:
                 last_reward = 0.1
 
-        if self.car.x < 10:
-            self.car.x = 10
+        if self.bug.x < 10:
+            self.bug.x = 10
             last_reward = -1
-        if self.car.x > self.width - 10:
-            self.car.x = self.width - 10
+        if self.bug.x > self.width - 10:
+            self.bug.x = self.width - 10
             last_reward = -1
-        if self.car.y < 10:
-            self.car.y = 10
+        if self.bug.y < 10:
+            self.bug.y = 10
             last_reward = -1
-        if self.car.y > self.height - 10:
-            self.car.y = self.height - 10
+        if self.bug.y > self.height - 10:
+            self.bug.y = self.height - 10
             last_reward = -1
 
         if distance < 100:
             goal_x = self.width-goal_x
             goal_y = self.height-goal_y
+            self.goal.update_position(goal_x, goal_y)
         last_distance = distance
 
 # Adding the painting tools
@@ -196,16 +211,17 @@ class MyPaintWidget(Widget):
 
 # Adding the API Buttons (clear, save and load)
 
-class CarApp(App):
+class bugApp(App):
 
     def build(self):
         parent = Game()
-        parent.serve_car()
+        parent.serve_bug()
+        parent.goal = Goal()
         Clock.schedule_interval(parent.update, 1.0/60.0)
         self.painter = MyPaintWidget()
-        clearbtn = Button(text = 'clear')
-        savebtn = Button(text = 'save', pos = (parent.width, 0))
-        loadbtn = Button(text = 'load', pos = (2 * parent.width, 0))
+        clearbtn = Button(text = 'clear', pos = (13 * parent.width, 0))
+        savebtn = Button(text = 'save', pos = (14 * parent.width, 0))
+        loadbtn = Button(text = 'load', pos = (15 * parent.width, 0))
         clearbtn.bind(on_release = self.clear_canvas)
         savebtn.bind(on_release = self.save)
         loadbtn.bind(on_release = self.load)
@@ -213,6 +229,7 @@ class CarApp(App):
         parent.add_widget(clearbtn)
         parent.add_widget(savebtn)
         parent.add_widget(loadbtn)
+        parent.add_widget(parent.goal)
         return parent
 
     def clear_canvas(self, obj):
@@ -232,4 +249,4 @@ class CarApp(App):
 
 # Running the whole thing
 if __name__ == '__main__':
-    CarApp().run()
+    bugApp().run()
